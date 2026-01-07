@@ -21,10 +21,10 @@ interface LocationMapProps {
   className?: string;
 }
 
-export function LocationMap({ 
-  lat, 
-  lng, 
-  onLocationChange, 
+export function LocationMap({
+  lat,
+  lng,
+  onLocationChange,
   draggable = false,
   className = "h-64 w-full rounded-lg"
 }: LocationMapProps) {
@@ -35,18 +35,24 @@ export function LocationMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    // Use provided coordinates or default to Kerala
+    const initialLat = (lat && lat !== 0) ? lat : 10.8505;
+    const initialLng = (lng && lng !== 0) ? lng : 76.2711;
+    const zoom = (lat && lat !== 0) ? 15 : 7;
+
     // Initialize map
-    const map = L.map(containerRef.current).setView([lat, lng], 15);
+    const map = L.map(containerRef.current).setView([initialLat, initialLng], zoom);
     mapRef.current = map;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    // Add marker
-    const marker = L.marker([lat, lng], { 
+    // Add marker only if we have valid coordinates, OR if we want to show a starting marker
+    // Let's show a marker at center but make it movable
+    const marker = L.marker([initialLat, initialLng], {
       icon: defaultIcon,
-      draggable: draggable 
+      draggable: draggable
     }).addTo(map);
     markerRef.current = marker;
 
@@ -54,6 +60,13 @@ export function LocationMap({
       marker.on('dragend', () => {
         const position = marker.getLatLng();
         onLocationChange?.(position.lat, position.lng);
+      });
+
+      // Add click to pick
+      map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        marker.setLatLng([lat, lng]);
+        onLocationChange?.(lat, lng);
       });
     }
 
@@ -65,10 +78,15 @@ export function LocationMap({
   }, []);
 
   // Update map view and marker when lat/lng changes
+  // Update map view and marker when lat/lng changes
   useEffect(() => {
     if (mapRef.current && markerRef.current) {
-      mapRef.current.setView([lat, lng], mapRef.current.getZoom());
-      markerRef.current.setLatLng([lat, lng]);
+      // If 0,0 is passed (e.g. manual mode reset), don't fly to 0,0 in ocean
+      // Check if valid
+      if (lat !== 0 && lng !== 0) {
+        mapRef.current.setView([lat, lng], 15);
+        markerRef.current.setLatLng([lat, lng]);
+      }
     }
   }, [lat, lng]);
 

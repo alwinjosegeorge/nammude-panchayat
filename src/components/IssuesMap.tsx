@@ -24,15 +24,20 @@ export function IssuesMap({ reports, className = "h-96 w-full rounded-lg" }: Iss
   const markersRef = useRef<L.Marker[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Filter out reports with invalid coordinates (0,0 or null)
+  const validReports = reports.filter(r =>
+    r.lat && r.lng && (r.lat !== 0 || r.lng !== 0)
+  );
+
   // Default center (Kerala, India)
   const defaultCenter: [number, number] = [10.8505, 76.2711];
-  
+
   // Calculate center based on reports if available
-  const center: [number, number] = reports.length > 0
+  const center: [number, number] = validReports.length > 0
     ? [
-        reports.reduce((sum, r) => sum + r.lat, 0) / reports.length,
-        reports.reduce((sum, r) => sum + r.lng, 0) / reports.length,
-      ]
+      validReports.reduce((sum, r) => sum + r.lat, 0) / validReports.length,
+      validReports.reduce((sum, r) => sum + r.lng, 0) / validReports.length,
+    ]
     : defaultCenter;
 
   useEffect(() => {
@@ -57,10 +62,10 @@ export function IssuesMap({ reports, className = "h-96 w-full rounded-lg" }: Iss
     markersRef.current = [];
 
     // Add markers for each report
-    reports.forEach((report) => {
+    validReports.forEach((report) => {
       const color = statusColors[report.status] || '#0ea5e9';
       const emoji = categoryIcons[report.category] || '📍';
-      
+
       const icon = L.divIcon({
         html: `
           <div style="
@@ -85,10 +90,10 @@ export function IssuesMap({ reports, className = "h-96 w-full rounded-lg" }: Iss
       });
 
       const marker = L.marker([report.lat, report.lng], { icon }).addTo(map);
-      
+
       const statusLabel = t.status[report.status as keyof typeof t.status] || report.status;
       const categoryLabel = t.categories[report.category as keyof typeof t.categories] || report.category;
-      
+
       marker.bindPopup(`
         <div style="padding: 8px; min-width: 180px;">
           <h3 style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${report.title}</h3>
