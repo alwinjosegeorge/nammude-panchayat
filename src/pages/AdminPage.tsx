@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +8,7 @@ import { Footer } from '@/components/Footer';
 import { IssuesMap } from '@/components/IssuesMap';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import { api } from '@/lib/api';
-import { Report, Status, Team, Category, categoryIcons } from '@/lib/types';
+import { Report, Status, Team, Category, categoryIcons, InternalNote, TeamEntity } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -39,6 +40,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
 
   const [reports, setReports] = useState<Report[]>([]);
+  const [teams, setTeams] = useState<TeamEntity[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showFilters, setShowFilters] = useState(false);
@@ -56,16 +58,20 @@ export default function AdminPage() {
       return;
     }
     if (user) {
-      loadReports();
+      loadData();
     }
   }, [user, loading, navigate]);
 
-  const loadReports = async () => {
+  const loadData = async () => {
     try {
-      const data = await api.getAllIssues();
-      setReports(data);
+      const [reportsData, teamsData] = await Promise.all([
+        api.getAllIssues(),
+        api.getTeams()
+      ]);
+      setReports(reportsData);
+      setTeams(teamsData);
     } catch (error) {
-      toast.error('Failed to load reports');
+      toast.error('Failed to load data');
     }
   };
 
@@ -106,60 +112,80 @@ export default function AdminPage() {
 
     try {
       await api.updateIssue(id, { status, history: newHistory });
-      await loadReports();
-      setSelectedReport({ ...report, status, history: newHistory }); // Optimistic/Local update for UI
+      await loadData();
+      setSelectedReport({ ...report, status, history: newHistory });
       toast.success(language === 'en' ? 'Status updated' : 'സ്റ്റാറ്റസ് അപ്ഡേറ്റ് ചെയ്തു');
     } catch (error) {
       toast.error('Failed to update status');
     }
   };
 
-  const handleTeamAssign = async (id: string, team: Team) => {
-    const report = reports.find(r => r.id === id);
-    if (!report) return;
+  const handleAssignTeam = async (teamId: string) => {
+    if (!selectedReport) return;
 
-    const newHistory = [...report.history];
-    if (report.status === 'submitted' || report.status === 'received') {
-      newHistory.push({
-        status: 'assigned',
-        timestamp: new Date().toISOString(),
-        note: `Assigned to ${team} team`,
-      });
-    }
+    // Find team name for history note
+    const teamName = teams.find(t => t.id === teamId)?.name || 'Unknown Team';
+
+    // Optimistic update
+    const newHistory = [...selectedReport.history, {
+      status: 'assigned' as Status,
+      timestamp: new Date().toISOString(),
+      note: `Assigned to ${teamName}`,
+      actor: 'Admin'
+    }];
 
     try {
-      await api.updateIssue(id, {
-        assignedTeam: team,
-        status: (report.status === 'submitted' || report.status === 'received') ? 'assigned' : report.status,
-        history: newHistory
-      });
-      await loadReports();
-      // Refetch to be safe or careful manual update
-      const updated = await api.getIssueByTrackingId(report.trackingId);
-      if (updated) setSelectedReport(updated);
+      await api.assignTeam(selectedReport.id, teamId);
+      // We should also update history here if assignTeam doesn't handle it, 
+      // but api.assignTeam only updates assigned_team_id/status. 
+      // Let's manually add history via updateIssue or assume assignTeam handles basic status.
+      // Better to use updateIssue for history consistency.
+      await api.updateIssue(selectedReport.id, { history: newHistory });
 
-      toast.success(language === 'en' ? 'Team assigned' : 'ടീം നിയോഗിച്ചു');
+      const updatedReport = {
+        ...selectedReport,
+        assignedTeamId: teamId,
+        status: 'assigned' as Status,
+        history: newHistory
+      };
+
+      setSelectedReport(updatedReport);
+      setReports(reports.map(r => r.id === selectedReport.id ? updatedReport : r));
+
+      toast.success('Team assigned successfully');
     } catch (error) {
       toast.error('Failed to assign team');
     }
   };
 
-  const handleAddNote = async (id: string) => {
-    if (!newNote.trim()) return;
-    const report = reports.find(r => r.id === id);
-    if (!report) return;
-
-    const updatedNotes = [...(report.internalNotes || []), `[${new Date().toLocaleString()}] ${newNote}`];
+  const handleAddNote = async () => {
+    if (!selectedReport || !newNote.trim()) return;
 
     try {
-      await api.updateIssue(id, { internalNotes: updatedNotes });
-      await loadReports();
+      const note: InternalNote = {
+        id: uuidv4(),
+        text: newNote,
+        sender: user?.email || 'Admin',
+        timestamp: new Date().toISOString(),
+      };
 
-      const updated = await api.getIssueByTrackingId(report.trackingId);
-      if (updated) setSelectedReport(updated);
+      const updatedNotes = [...(selectedReport.internalNotes || []), note];
+
+      await api.updateIssue(selectedReport.id, {
+        internalNotes: updatedNotes,
+      });
+
+      setSelectedReport({ ...selectedReport, internalNotes: updatedNotes });
+
+      // Update local list as well
+      setReports(reports.map(r =>
+        r.id === selectedReport.id
+          ? { ...r, internalNotes: updatedNotes }
+          : r
+      ));
 
       setNewNote('');
-      toast.success(language === 'en' ? 'Note added' : 'കുറിപ്പ് ചേർത്തു');
+      toast.success('Note added');
     } catch (error) {
       toast.error('Failed to add note');
     }
@@ -424,30 +450,6 @@ export default function AdminPage() {
                 )}>
                   {language === 'en' ? 'Complaints by Category' : 'വിഭാഗം അനുസരിച്ച് പരാതികൾ'}
                 </h3>
-                <div className="space-y-3">
-                  {categoryStats.map(([category, count]) => (
-                    <div key={category} className="flex items-center gap-3">
-                      <span className="text-xl w-8">{categoryIcons[category as Category]}</span>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={cn(
-                            "text-sm text-foreground",
-                            language === 'ml' && "font-malayalam"
-                          )}>
-                            {t.categories[category as keyof typeof t.categories]}
-                          </span>
-                          <span className="text-sm font-medium text-muted-foreground">{count}</span>
-                        </div>
-                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className="h-full gradient-primary rounded-full"
-                            style={{ width: `${(count / stats.total) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
 
               {/* Status Distribution */}
@@ -560,50 +562,76 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Update Status */}
-              <div className="space-y-2">
-                <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                  {t.updateStatus}
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['received', 'assigned', 'inProgress', 'resolved', 'closed'] as Status[]).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => handleStatusUpdate(selectedReport.id, status)}
-                      className={cn(
-                        "px-3 py-2 text-xs rounded-lg border transition-colors",
-                        selectedReport.status === status
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border hover:border-primary hover:bg-secondary"
-                      )}
-                    >
-                      {t.status[status]}
-                    </button>
-                  ))}
+              {/* Status & Team Assignment Card */}
+              <div className="card-elevated p-6 space-y-6">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Status</h3>
+                  {/* Disable status update if no team assigned */}
+                  {!selectedReport.assignedTeamId ? (
+                    <div className="p-3 bg-secondary/50 rounded-lg text-sm text-muted-foreground border border-dashed text-center">
+                      Assign a team to update status
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {/* Existing Status Buttons */}
+                      {['assigned', 'inProgress', 'resolved', 'closed'].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => handleStatusUpdate(selectedReport.id, s as Status)}
+                          className={cn(
+                            "flex-1 py-2 text-xs font-medium rounded-md border transition-all",
+                            selectedReport.status === s
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background hover:bg-secondary"
+                          )}
+                        >
+                          {t.status[s as keyof typeof t.status]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              {/* Assign Team */}
-              <div className="space-y-2">
-                <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                  {t.assignTeam}
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['roads', 'water', 'electricity', 'sanitation', 'general'] as Team[]).map((team) => (
-                    <button
-                      key={team}
-                      onClick={() => handleTeamAssign(selectedReport.id, team)}
-                      className={cn(
-                        "flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-colors",
-                        selectedReport.assignedTeam === team
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border hover:border-primary hover:bg-secondary"
-                      )}
+                {/* Team Assignment */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Assigned Team</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    <select
+                      className="w-full p-2 rounded-md border text-sm bg-background"
+                      value={selectedReport.assignedTeamId || ''}
+                      onChange={(e) => handleAssignTeam(e.target.value)}
                     >
-                      <Users className="h-3 w-3" />
-                      {t.teams[team]}
-                    </button>
-                  ))}
+                      <option value="">Select Team</option>
+                      {teams.map(team => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Urgency */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">{t.urgencyLevel}</h3>
+                  <div className="flex gap-2">
+                    {/* ... keeping urgency buttons ... */}
+                    {['normal', 'high', 'urgent'].map((u) => (
+                      <button
+                        key={u}
+                        onClick={() => api.updateIssue(selectedReport.id, { urgency: u as any }).then(() => {
+                          setReports(reports.map(r => r.id === selectedReport.id ? { ...r, urgency: u as any } : r));
+                          setSelectedReport({ ...selectedReport, urgency: u as any });
+                        })}
+                        className={cn(
+                          "flex-1 py-2 text-xs font-medium rounded-md border transition-all",
+                          selectedReport.urgency === u
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background hover:bg-secondary"
+                        )}
+                      >
+                        {u.charAt(0).toUpperCase() + u.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -619,11 +647,11 @@ export default function AdminPage() {
                     onChange={(e) => setNewNote(e.target.value)}
                     placeholder={language === 'en' ? 'Add a note...' : 'കുറിപ്പ് ചേർക്കുക...'}
                     className="input-field flex-1 text-sm"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddNote(selectedReport.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
                   />
                   <Button
                     size="sm"
-                    onClick={() => handleAddNote(selectedReport.id)}
+                    onClick={() => handleAddNote()}
                     disabled={!newNote.trim()}
                   >
                     <MessageSquare className="h-4 w-4" />
@@ -631,9 +659,13 @@ export default function AdminPage() {
                 </div>
                 {selectedReport.internalNotes && selectedReport.internalNotes.length > 0 && (
                   <div className="mt-2 space-y-2">
-                    {selectedReport.internalNotes.map((note, i) => (
-                      <div key={i} className="p-2 bg-secondary rounded-lg text-xs text-muted-foreground">
-                        {note}
+                    {selectedReport.internalNotes.map((note) => (
+                      <div key={note.id || Math.random()} className="p-3 bg-secondary/50 rounded-lg text-xs space-y-1">
+                        <div className="flex justify-between items-center text-muted-foreground/80">
+                          <span className="font-medium">{note.sender}</span>
+                          <span>{new Date(note.timestamp).toLocaleString()}</span>
+                        </div>
+                        <p className="text-foreground">{note.text}</p>
                       </div>
                     ))}
                   </div>

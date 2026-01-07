@@ -50,11 +50,27 @@ export interface Report {
   };
   anonymous: boolean;
   status: Status;
-  assignedTeam?: Team;
+  assignedTeam?: Team; // Legacy or Display name
+  assignedTeamId?: string; // Foreign Key
+  assignedAt?: string;
   createdAt: string;
   updatedAt: string;
   history: TimelineEntry[];
-  internalNotes?: string[];
+  internalNotes?: InternalNote[];
+}
+
+export interface TeamEntity {
+  id: string;
+  name: string;
+  email: string;
+  userId?: string;
+}
+
+export interface InternalNote {
+  id: string;
+  text: string;
+  sender: string;
+  timestamp: string;
 }
 
 export interface LocationData {

@@ -9,6 +9,10 @@ import HomePage from "./pages/HomePage";
 import ReportPage from "./pages/ReportPage";
 import TrackPage from "./pages/TrackPage";
 import AdminPage from "./pages/AdminPage";
+import PrivacyPage from '@/pages/PrivacyPage';
+import TermsPage from '@/pages/TermsPage';
+import TeamLoginPage from '@/pages/TeamLoginPage';
+import TeamDashboard from '@/pages/TeamDashboard';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +30,12 @@ const App = () => (
               <Route path="/report" element={<ReportPage />} />
               <Route path="/track" element={<TrackPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+
+              {/* Team Routes */}
+              <Route path="/team/login" element={<TeamLoginPage />} />
+              <Route path="/team/dashboard" element={<TeamDashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

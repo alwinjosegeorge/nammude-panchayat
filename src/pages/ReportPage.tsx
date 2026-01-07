@@ -10,7 +10,7 @@ import { detectLocation, reverseGeocode } from '@/lib/geocoding';
 import { api } from '@/lib/api';
 import { Category, Urgency, Report, categoryToTeam, LocationData as BaseLocationData } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { MapPin, Loader2, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+import { MapPin, Camera, X, Upload, Loader2, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,24 +48,53 @@ export default function ReportPage() {
 
   // Draft logic removed for Supabase integration cleanup
 
+  const setManualLocation = (isManual: boolean) => {
+    setLocation(prev => prev ? ({ ...prev, isManual }) : null);
+  };
+
   const handleDetectLocation = async () => {
     setIsDetecting(true);
-    try {
-      const locationData = await detectLocation();
-      setLocation(locationData);
+    setManualLocation(false); // Ensure manual mode is off initially for retry
 
-      if (locationData.possiblePanchayats && locationData.possiblePanchayats.length > 1) {
+    // Toast: Requesting Location
+    toast.message(
+      language === 'en' ? 'Requesting Location...' : 'സ്ഥലം കണ്ടെത്തുന്നു...',
+      { description: language === 'en' ? 'Please allow location access' : 'ദയവായി ലൊക്കേഷൻ അനുമതി നൽകുക' }
+    );
+
+    try {
+      const data = await detectLocation();
+      setLocation({ ...data, isManual: false });
+
+      if (data.possiblePanchayats && data.possiblePanchayats.length > 1) {
         setShowPanchayatOptions(true);
       }
+      toast.success(language === 'en' ? 'Location detected!' : 'സ്ഥലം കണ്ടെത്തി!');
+    } catch (error: any) {
+      console.error('Location detection failed:', error);
 
-      toast.success(language === 'en' ? 'Location detected!' : 'ലൊക്കേഷൻ കണ്ടെത്തി!');
-    } catch (error) {
-      console.error('Location error:', error);
-      toast.error(
-        language === 'en'
-          ? 'Could not detect location. Please enable location services.'
-          : 'ലൊക്കേഷൻ കണ്ടെത്താനായില്ല. ലൊക്കേഷൻ സേവനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക.'
-      );
+      let errorMsg = language === 'en' ? 'Failed to detect location' : 'സ്ഥലം കണ്ടെത്താനായില്ല';
+
+      if (error.message === 'LOCATION_DENIED') {
+        errorMsg = language === 'en' ? 'Location permission denied' : 'ലൊക്കേഷൻ അനുമതി നിരസിച്ചു';
+      } else if (error.message === 'LOCATION_TIMEOUT') {
+        errorMsg = language === 'en' ? 'Location request timed out' : 'ലൊക്കേഷൻ സമയം കഴിഞ്ഞു';
+      } else if (error.message === 'LOCATION_UNAVAILABLE') {
+        errorMsg = language === 'en' ? 'Location unavailable' : 'സ്ഥലം ലഭ്യമല്ല';
+      }
+
+      toast.error(errorMsg, {
+        description: language === 'en' ? 'Switched to manual entry' : 'ഓരു ലൊക്കേഷൻ സ്വയം നൽകുക',
+      });
+
+      // Auto-switch to manual mode on failure
+      setLocation(prev => ({
+        address: prev?.address || '',
+        lat: 0,
+        lng: 0,
+        panchayat: prev?.panchayat || '',
+        isManual: true, // Force manual mode
+      }));
     } finally {
       setIsDetecting(false);
     }

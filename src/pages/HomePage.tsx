@@ -18,9 +18,9 @@ export default function HomePage() {
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        const { data } = await api.getAllIssues();
+        const data = await api.getPublicIssues();
         if (data) {
-          setReports(data.slice(0, 5));
+          setReports(data.slice(0, 5)); // Keep limit to recent 5
         }
       } catch (error) {
         console.error('Failed to fetch reports:', error);

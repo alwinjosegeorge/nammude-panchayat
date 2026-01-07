@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Report, Status } from './types';
+import { Report, Status, InternalNote, TeamEntity } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to convert DB (snake_case) to Frontend (camelCase)
@@ -117,6 +117,18 @@ export const api = {
         return data.map(mapToReport);
     },
 
+    // Public: Get Recent Issues (Secure RPC)
+    getPublicIssues: async (): Promise<Report[]> => {
+        const { data, error } = await supabase
+            .rpc('get_public_reports');
+
+        if (error) {
+            console.error('Error fetching public issues:', error);
+            return [];
+        }
+        return (data || []).map(mapToReport);
+    },
+
     // Admin: Generic Update
     updateIssue: async (id: string, updates: Partial<Report>) => {
         const dbUpdates: any = {
@@ -126,7 +138,7 @@ export const api = {
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.history) dbUpdates.history = updates.history;
         if (updates.assignedTeam) dbUpdates.assigned_team = updates.assignedTeam;
-        if (updates.internalNotes) dbUpdates.internal_notes = updates.internalNotes;
+        if (updates.internalNotes) dbUpdates.internal_notes = updates.internalNotes; // JSONB handling
 
         const { error } = await supabase
             .from('report_issue')
@@ -134,5 +146,39 @@ export const api = {
             .eq('id', id);
 
         if (error) throw error;
-    }
+    },
+
+    // Team Features
+    getTeams: async (): Promise<TeamEntity[]> => {
+        const { data, error } = await supabase
+            .from('teams')
+            .select('*')
+            .order('name');
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    assignTeam: async (issueId: string, teamId: string) => {
+        const { error } = await supabase
+            .from('report_issue')
+            .update({
+                assigned_team_id: teamId,
+                assigned_at: new Date().toISOString(),
+                status: 'assigned'
+            })
+            .eq('id', issueId);
+
+        if (error) throw error;
+    },
+
+    getTeamIssues: async (): Promise<Report[]> => {
+        const { data, error } = await supabase
+            .from('report_issue')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(mapToReport);
+    },
 };

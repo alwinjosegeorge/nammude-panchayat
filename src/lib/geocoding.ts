@@ -1,5 +1,6 @@
 import { LocationData } from './types';
 
+// Mobile-optimized geolocation with fallback
 export async function getCurrentLocation(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -7,11 +8,32 @@ export async function getCurrentLocation(): Promise<GeolocationPosition> {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 15000, // Increased timeout for initial fix
-      maximumAge: 0,
-    });
+    const options = {
+      enableHighAccuracy: true, // Try GPS first
+      timeout: 30000,          // 30s timeout for mobile GPS (critical fix)
+      maximumAge: 0,           // Force fresh position
+    };
+
+    const success = (pos: GeolocationPosition) => resolve(pos);
+
+    const error = (err: GeolocationPositionError) => {
+      // Enhanced error messages for UI
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          reject(new Error('LOCATION_DENIED')); // Specific code for UI
+          break;
+        case err.TIMEOUT:
+          reject(new Error('LOCATION_TIMEOUT'));
+          break;
+        case err.POSITION_UNAVAILABLE:
+          reject(new Error('LOCATION_UNAVAILABLE'));
+          break;
+        default:
+          reject(err);
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(success, error, options);
   });
 }
 

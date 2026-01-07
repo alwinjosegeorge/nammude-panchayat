@@ -5,6 +5,7 @@ import { Session, User } from '@supabase/supabase-js';
 type AuthContextType = {
     session: Session | null;
     user: User | null;
+    userRole: 'admin' | 'team' | null;
     loading: boolean;
     signInWithEmail: (email: string) => Promise<{ error: any }>;
     signOut: () => Promise<{ error: any }>;
@@ -13,6 +14,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
     session: null,
     user: null,
+    userRole: null,
     loading: true,
     signInWithEmail: async () => ({ error: null }),
     signOut: async () => ({ error: null }),
@@ -21,14 +23,47 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
+    const [userRole, setUserRole] = useState<'admin' | 'team' | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const checkUserRole = async (uid: string) => {
+        // Check Admin
+        const { data: adminData } = await supabase
+            .from('admins')
+            .select('id')
+            .eq('user_id', uid)
+            .single();
+
+        if (adminData) {
+            setUserRole('admin');
+            return;
+        }
+
+        // Check Team
+        const { data: teamData } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('user_id', uid)
+            .single();
+
+        if (teamData) {
+            setUserRole('team');
+            return;
+        }
+
+        setUserRole(null);
+    };
 
     useEffect(() => {
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
-            setLoading(false);
+            if (session?.user) {
+                checkUserRole(session.user.id);
+            } else {
+                setLoading(false);
+            }
         });
 
         // Listen for changes
@@ -37,39 +72,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
-            setLoading(false);
+            if (session?.user) {
+                checkUserRole(session.user.id).then(() => setLoading(false));
+            } else {
+                setUserRole(null);
+                setLoading(false);
+            }
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    const signInWithEmail = async (email: string) => {
-        // We only use Magic Link for simplicity as per request "Email + Password" 
-        // Wait, request said "Email + Password".
-        // I will implementation sign in with password.
-        // However, I need to know if I should implement sign up?
-        // Request: "Public users should NOT have login or signup."
-        // "Create exactly one admin role."
-        // So I assume the Admin is pre-created or I should create it.
-        // I'll implement signInWithPassword.
-        // But since I don't have the password, I will just implement the method handle.
-        // For now I will assume the admin user exists or I will create it.
-        // Let's implement standard email/password sign in.
-        return { error: new Error("Function not implemented in context directly, use supabase.auth.signInWithPassword") };
-    };
-
-    // Actually, let's expose specific functions or just use supabase directly in components? 
-    // Context is good for state.
-
     const value = {
         session,
         user,
+        userRole,
         loading,
-        signInWithEmail: async (email: string) => {
-            // Placeholder, actually we will use signInWithPassword in the login form
-            return { error: null };
+        signInWithEmail: async (email: string) => ({ error: null }),
+        signOut: async () => {
+            setUserRole(null);
+            return await supabase.auth.signOut();
         },
-        signOut: async () => await supabase.auth.signOut(),
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

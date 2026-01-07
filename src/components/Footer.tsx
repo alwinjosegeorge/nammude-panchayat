@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
@@ -21,24 +22,24 @@ export function Footer() {
           </div>
 
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="#" className={cn(
-              "hover:text-foreground transition-colors",
+            <Link to="/privacy" className={cn(
+              "text-sm text-muted-foreground hover:text-primary transition-colors",
               language === 'ml' && "font-malayalam"
             )}>
               {t.privacyPolicy}
-            </a>
-            <a href="#" className={cn(
-              "hover:text-foreground transition-colors",
+            </Link>
+            <Link to="/terms" className={cn(
+              "text-sm text-muted-foreground hover:text-primary transition-colors",
               language === 'ml' && "font-malayalam"
             )}>
               {t.termsOfService}
-            </a>
-            <a href="#" className={cn(
-              "hover:text-foreground transition-colors",
+            </Link>
+            <Link to="/contact" className={cn(
+              "text-sm text-muted-foreground hover:text-primary transition-colors",
               language === 'ml' && "font-malayalam"
             )}>
               {t.contact}
-            </a>
+            </Link>
           </nav>
         </div>
 
