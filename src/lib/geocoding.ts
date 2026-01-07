@@ -9,7 +9,7 @@ export async function getCurrentLocation(): Promise<GeolocationPosition> {
 
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 15000, // Increased timeout for initial fix
       maximumAge: 0,
     });
   });
@@ -32,9 +32,9 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Location
 
     const data = await response.json();
     const address = data.address || {};
-    
+
     // Extract panchayat/village name from various fields
-    const panchayat = 
+    const panchayat =
       address.village ||
       address.suburb ||
       address.town ||
@@ -43,7 +43,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Location
       address.city ||
       address.county ||
       'Unknown Location';
-    
+
     // Build full address
     const addressParts = [
       address.road,

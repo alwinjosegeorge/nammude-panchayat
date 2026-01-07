@@ -190,21 +190,12 @@ export default function HomePage() {
 
         {/* Recent Issues Section */}
         <section className="container py-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className={cn(
-              "text-xl font-semibold text-foreground",
-              language === 'ml' && "font-malayalam"
-            )}>
-              {t.recentIssues}
-            </h2>
-            <Link
-              to="/admin"
-              className="text-sm text-primary font-medium flex items-center gap-1 hover:underline"
-            >
-              <span className={language === 'ml' ? 'font-malayalam' : ''}>{t.viewAll}</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
+          <h2 className={cn(
+            "text-xl font-semibold text-foreground",
+            language === 'ml' && "font-malayalam"
+          )}>
+            {t.recentIssues}
+          </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {reports.map((report, index) => (
@@ -233,6 +224,6 @@ export default function HomePage() {
       </main>
 
       <Footer />
-    </div>
+    </div >
   );
 }

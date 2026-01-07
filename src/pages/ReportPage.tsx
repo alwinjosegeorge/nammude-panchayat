@@ -8,12 +8,16 @@ import { PhotoUpload } from '@/components/PhotoUpload';
 import { LocationMap } from '@/components/LocationMap';
 import { detectLocation, reverseGeocode } from '@/lib/geocoding';
 import { api } from '@/lib/api';
-import { Category, Urgency, Report, categoryToTeam, LocationData } from '@/lib/types';
+import { Category, Urgency, Report, categoryToTeam, LocationData as BaseLocationData } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { MapPin, Loader2, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+
+interface LocationData extends BaseLocationData {
+  isManual?: boolean;
+}
 
 const generateTrackingId = () => {
   return 'TRK' + Math.floor(100000 + Math.random() * 900000).toString();
@@ -287,103 +291,142 @@ export default function ReportPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className={cn("label-text mb-0", language === 'ml' && "font-malayalam")}>
-                  {t.panchayatName} *
+                  {t.location} *
                 </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDetectLocation}
-                  disabled={isDetecting}
-                >
-                  {isDetecting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      <span className={language === 'ml' ? 'font-malayalam' : ''}>{t.detecting}</span>
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="h-4 w-4 mr-2" />
-                      <span className={language === 'ml' ? 'font-malayalam' : ''}>{t.detectLocation}</span>
-                    </>
-                  )}
-                </Button>
+                <div className="flex gap-2 p-1 bg-secondary rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocation({ ...location, isManual: false } as any);
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      !location?.isManual ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t.autoDetect}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Preserve address if switching, but set isManual flag
+                      setLocation(prev => ({
+                        address: prev?.address || '',
+                        lat: prev?.lat,
+                        lng: prev?.lng,
+                        panchayat: prev?.panchayat || '',
+                        isManual: true
+                      } as any));
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                      location?.isManual ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t.manualEntry}
+                  </button>
+                </div>
               </div>
 
-              {location && (
-                <div className="space-y-4 animate-slide-up">
-                  {/* Panchayat Options */}
-                  {showPanchayatOptions && location.possiblePanchayats && (
-                    <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 space-y-3">
-                      <div className="flex items-center gap-2 text-warning">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="text-sm font-medium">
-                          {language === 'en' ? 'Multiple locations found' : 'ഒന്നിലധികം ലൊക്കേഷനുകൾ കണ്ടെത്തി'}
+              {!location?.isManual ? (
+                // Auto Detect Mode
+                <div className="space-y-4 animate-fade-in">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-auto py-4 justify-start"
+                    onClick={handleDetectLocation}
+                    disabled={isDetecting}
+                  >
+                    <div className="flex items-start gap-3 text-left">
+                      <div className="p-2 rounded-full bg-primary/10 text-primary">
+                        {isDetecting ? <Loader2 className="h-5 w-5 animate-spin" /> : <MapPin className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <span className={cn("font-medium block", language === 'ml' && "font-malayalam")}>
+                          {isDetecting ? t.detecting : t.detectLocation}
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-0.5 block">
+                          {language === 'en' ? 'Use GPS to find your location' : 'നിങ്ങളുടെ സ്ഥലം കണ്ടെത്താൻ GPS ഉപയോഗിക്കുക'}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {location.possiblePanchayats.map((p) => (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => handlePanchayatSelect(p)}
-                            className={cn(
-                              "px-3 py-1.5 text-sm rounded-lg border transition-colors",
-                              location.panchayat === p
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-card border-border hover:border-primary"
-                            )}
-                          >
-                            {p}
-                          </button>
-                        ))}
+                    </div>
+                  </Button>
+
+                  {location && location.lat && (
+                    <div className="space-y-4 animate-slide-up">
+                      {/* Panchayat Options */}
+                      {showPanchayatOptions && location.possiblePanchayats && (
+                        <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 space-y-3">
+                          <div className="flex items-center gap-2 text-warning">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span className="text-sm font-medium">
+                              {language === 'en' ? 'Multiple locations found' : 'ഒന്നിലധികം ലൊക്കേഷനുകൾ കണ്ടെത്തി'}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {location.possiblePanchayats.map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => handlePanchayatSelect(p)}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded-lg border transition-colors",
+                                  location.panchayat === p
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-card border-border hover:border-primary"
+                                )}
+                              >
+                                {p}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <LocationMap
+                        lat={location.lat!}
+                        lng={location.lng!}
+                        onLocationChange={handleMapLocationChange}
+                        draggable={true}
+                        className="h-48 rounded-lg border border-border"
+                      />
+                      <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg border border-dashed">
+                        <p className="font-medium text-foreground mb-1">{location.panchayat}</p>
+                        <p>{location.address}</p>
                       </div>
                     </div>
                   )}
-
-                  {/* Map */}
-                  <LocationMap
-                    lat={location.lat}
-                    lng={location.lng}
-                    onLocationChange={handleMapLocationChange}
-                    draggable={true}
-                    className="h-64 rounded-lg border border-border"
-                  />
-
-                  {/* Location Fields */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                        {t.panchayatName}
-                      </label>
-                      <input
-                        type="text"
-                        value={location.panchayat}
-                        onChange={(e) => setLocation({ ...location, panchayat: e.target.value })}
-                        className="input-field"
-                      />
-                    </div>
-                    <div>
-                      <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                        {t.coordinates}
-                      </label>
-                      <input
-                        type="text"
-                        value={`${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}
-                        readOnly
-                        className="input-field bg-muted"
-                      />
-                    </div>
+                </div>
+              ) : (
+                // Manual Mode
+                <div className="space-y-4 animate-fade-in">
+                  <div>
+                    <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
+                      {t.address} *
+                    </label>
+                    <textarea
+                      value={location?.address || ''}
+                      onChange={(e) => setLocation(prev => ({
+                        ...prev!,
+                        address: e.target.value,
+                        isManual: true,
+                        panchayat: prev?.panchayat || 'Manual Entry'
+                      }))}
+                      placeholder={language === 'en' ? "Enter detailed address / landmark..." : "വിശദമായ വിലാസം / ലാൻഡ്മാർക്ക് നൽകുക..."}
+                      className={cn("input-field min-h-[100px]", language === 'ml' && "font-malayalam")}
+                    />
                   </div>
                   <div>
                     <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                      {t.address}
+                      {t.panchayatName}
                     </label>
                     <input
                       type="text"
-                      value={location.address}
-                      onChange={(e) => setLocation({ ...location, address: e.target.value })}
-                      className="input-field"
+                      value={location?.panchayat === 'Manual Entry' ? '' : location?.panchayat}
+                      onChange={(e) => setLocation(prev => ({ ...prev!, panchayat: e.target.value }))}
+                      placeholder={language === 'en' ? "Enter Panchayat Name" : "പഞ്ചായത്തിന്റെ പേര് നൽകുക"}
+                      className={cn("input-field", language === 'ml' && "font-malayalam")}
                     />
                   </div>
                 </div>

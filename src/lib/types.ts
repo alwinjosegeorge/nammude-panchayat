@@ -1,4 +1,4 @@
-export type Category = 
+export type Category =
   | 'brokenRoad'
   | 'streetlight'
   | 'waterLeak'
@@ -10,7 +10,7 @@ export type Category =
 
 export type Urgency = 'normal' | 'high' | 'urgent';
 
-export type Status = 
+export type Status =
   | 'submitted'
   | 'received'
   | 'assigned'
@@ -18,7 +18,7 @@ export type Status =
   | 'resolved'
   | 'closed';
 
-export type Team = 
+export type Team =
   | 'roads'
   | 'water'
   | 'electricity'
@@ -40,8 +40,8 @@ export interface Report {
   description: string;
   panchayat: string;
   address: string;
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
   urgency: Urgency;
   photos: string[];
   contact?: {
@@ -58,8 +58,8 @@ export interface Report {
 }
 
 export interface LocationData {
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
   address: string;
   panchayat: string;
   possiblePanchayats?: string[];
