@@ -14,6 +14,7 @@ import TermsPage from '@/pages/TermsPage';
 import TeamLoginPage from '@/pages/TeamLoginPage';
 import TeamDashboard from '@/pages/TeamDashboard';
 import NotFound from "./pages/NotFound";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -22,23 +23,25 @@ const App = () => (
     <LanguageProvider>
       <AuthProvider>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/report" element={<ReportPage />} />
-              <Route path="/track" element={<TrackPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/terms" element={<TermsPage />} />
+          <ErrorBoundary>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/report" element={<ReportPage />} />
+                <Route path="/track" element={<TrackPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
 
-              {/* Team Routes */}
-              <Route path="/team/login" element={<TeamLoginPage />} />
-              <Route path="/team/dashboard" element={<TeamDashboard />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+                {/* Team Routes */}
+                <Route path="/team/login" element={<TeamLoginPage />} />
+                <Route path="/team/dashboard" element={<TeamDashboard />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </ErrorBoundary>
         </TooltipProvider>
       </AuthProvider>
     </LanguageProvider>

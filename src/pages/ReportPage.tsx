@@ -14,6 +14,11 @@ import { MapPin, Camera, X, Upload, Loader2, CheckCircle, Copy, AlertTriangle } 
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  KERALA_DISTRICTS,
+  KERALA_PANCHAYATS,
+  District
+} from '@/lib/kerala-data';
 
 interface LocationData extends BaseLocationData {
   isManual?: boolean;
@@ -29,6 +34,7 @@ export default function ReportPage() {
 
   // Form state
   const [category, setCategory] = useState<Category | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<District | ''>('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
@@ -37,6 +43,19 @@ export default function ReportPage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [anonymous, setAnonymous] = useState(false);
+
+  // Auto-select District/Panchayat if detected
+  useEffect(() => {
+    if (location?.panchayat) {
+      // Try to find which district this panchayat belongs to
+      for (const dist of KERALA_DISTRICTS) {
+        if (KERALA_PANCHAYATS[dist].includes(location.panchayat)) {
+          setSelectedDistrict(dist);
+          break;
+        }
+      }
+    }
+  }, [location?.panchayat]);
 
   // UI state
   const [isDetecting, setIsDetecting] = useState(false);
@@ -70,16 +89,17 @@ export default function ReportPage() {
         setShowPanchayatOptions(true);
       }
       toast.success(language === 'en' ? 'Location detected!' : 'സ്ഥലം കണ്ടെത്തി!');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Location detection failed:', error);
+      const err = error as { message: string };
 
       let errorMsg = language === 'en' ? 'Failed to detect location' : 'സ്ഥലം കണ്ടെത്താനായില്ല';
 
-      if (error.message === 'LOCATION_DENIED') {
+      if (err.message === 'LOCATION_DENIED') {
         errorMsg = language === 'en' ? 'Location permission denied' : 'ലൊക്കേഷൻ അനുമതി നിരസിച്ചു';
-      } else if (error.message === 'LOCATION_TIMEOUT') {
+      } else if (err.message === 'LOCATION_TIMEOUT') {
         errorMsg = language === 'en' ? 'Location request timed out' : 'ലൊക്കേഷൻ സമയം കഴിഞ്ഞു';
-      } else if (error.message === 'LOCATION_UNAVAILABLE') {
+      } else if (err.message === 'LOCATION_UNAVAILABLE') {
         errorMsg = language === 'en' ? 'Location unavailable' : 'സ്ഥലം ലഭ്യമല്ല';
       }
 
@@ -326,7 +346,7 @@ export default function ReportPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setLocation({ ...location, isManual: false } as any);
+                      setLocation(prev => prev ? { ...prev, isManual: false } : null);
                     }}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
@@ -344,8 +364,9 @@ export default function ReportPage() {
                         lat: prev?.lat,
                         lng: prev?.lng,
                         panchayat: prev?.panchayat || '',
+                        possiblePanchayats: prev?.possiblePanchayats,
                         isManual: true
-                      } as any));
+                      }));
                     }}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
@@ -428,7 +449,7 @@ export default function ReportPage() {
                   )}
                 </div>
               ) : (
-                // Manual Mode
+                // Manual / Dropdown Selection
                 <div className="space-y-4 animate-fade-in">
                   <div>
                     <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
@@ -440,23 +461,57 @@ export default function ReportPage() {
                         ...prev!,
                         address: e.target.value,
                         isManual: true,
-                        panchayat: prev?.panchayat || 'Manual Entry'
+                        panchayat: prev?.panchayat || ''
                       }))}
                       placeholder={language === 'en' ? "Enter detailed address / landmark..." : "വിശദമായ വിലാസം / ലാൻഡ്മാർക്ക് നൽകുക..."}
                       className={cn("input-field min-h-[100px]", language === 'ml' && "font-malayalam")}
                     />
                   </div>
-                  <div>
-                    <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                      {t.panchayatName}
-                    </label>
-                    <input
-                      type="text"
-                      value={location?.panchayat === 'Manual Entry' ? '' : location?.panchayat}
-                      onChange={(e) => setLocation(prev => ({ ...prev!, panchayat: e.target.value }))}
-                      placeholder={language === 'en' ? "Enter Panchayat Name" : "പഞ്ചായത്തിന്റെ പേര് നൽകുക"}
-                      className={cn("input-field", language === 'ml' && "font-malayalam")}
-                    />
+
+                  {/* District Selection */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
+                        {language === 'en' ? 'District' : 'ജില്ല'} *
+                      </label>
+                      <select
+                        value={selectedDistrict}
+                        onChange={(e) => {
+                          setSelectedDistrict(e.target.value as District);
+                          // Clear panchayat if district changes
+                          setLocation(prev => prev ? ({ ...prev, panchayat: '' }) : null);
+                        }}
+                        className={cn("input-field w-full", language === 'ml' && "font-malayalam")}
+                      >
+                        <option value="">{language === 'en' ? 'Select District' : 'ജില്ല തിരഞ്ഞെടുക്കുക'}</option>
+                        {KERALA_DISTRICTS.map(dist => (
+                          <option key={dist} value={dist}>{dist}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Panchayat Selection */}
+                    <div>
+                      <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
+                        {t.panchayatName} *
+                      </label>
+                      <select
+                        value={location?.panchayat || ''}
+                        onChange={(e) => setLocation(prev => ({ ...prev!, panchayat: e.target.value }))}
+                        disabled={!selectedDistrict}
+                        className={cn("input-field w-full", language === 'ml' && "font-malayalam")}
+                      >
+                        <option value="">
+                          {selectedDistrict
+                            ? (language === 'en' ? 'Select Panchayat' : 'പഞ്ചായത്ത് തിരഞ്ഞെടുക്കുക')
+                            : (language === 'en' ? 'Select District First' : 'ആദ്യം ജില്ല തിരഞ്ഞെടുക്കുക')
+                          }
+                        </option>
+                        {selectedDistrict && KERALA_PANCHAYATS[selectedDistrict]?.map(panch => (
+                          <option key={panch} value={panch}>{panch}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}

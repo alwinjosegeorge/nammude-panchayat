@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Report, categoryIcons } from '@/lib/types';
@@ -18,6 +18,8 @@ const statusColors: Record<string, string> = {
   closed: '#6b7280',
 };
 
+const defaultCenter: [number, number] = [10.8505, 76.2711];
+
 export function IssuesMap({ reports, className = "h-96 w-full rounded-lg" }: IssuesMapProps) {
   const { t } = useLanguage();
   const mapRef = useRef<L.Map | null>(null);
@@ -25,20 +27,22 @@ export function IssuesMap({ reports, className = "h-96 w-full rounded-lg" }: Iss
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Filter out reports with invalid coordinates (0,0 or null)
-  const validReports = reports.filter(r =>
+  const validReports = useMemo(() => reports.filter(r =>
     r.lat && r.lng && (r.lat !== 0 || r.lng !== 0)
-  );
+  ), [reports]);
 
   // Default center (Kerala, India)
-  const defaultCenter: [number, number] = [10.8505, 76.2711];
+  // const defaultCenter: [number, number] = [10.8505, 76.2711]; // MOVED OUTSIDE
 
-  // Calculate center based on reports if available
-  const center: [number, number] = validReports.length > 0
-    ? [
-      validReports.reduce((sum, r) => sum + r.lat, 0) / validReports.length,
-      validReports.reduce((sum, r) => sum + r.lng, 0) / validReports.length,
-    ]
-    : defaultCenter;
+  // Memoize center to prevent unnecessary re-renders
+  const center: [number, number] = useMemo(() => {
+    if (validReports.length === 0) return defaultCenter;
+    return [
+      validReports.reduce((sum, r) => sum + r.lat!, 0) / validReports.length,
+      validReports.reduce((sum, r) => sum + r.lng!, 0) / validReports.length,
+    ] as [number, number];
+  }, [validReports]);
+
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -120,7 +124,7 @@ export function IssuesMap({ reports, className = "h-96 w-full rounded-lg" }: Iss
         mapRef.current = null;
       }
     };
-  }, [reports, t]);
+  }, [validReports, reports.length, t, center]);
 
   return (
     <div ref={containerRef} className={className} />

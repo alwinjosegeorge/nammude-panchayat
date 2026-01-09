@@ -39,10 +39,10 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
 
             toast.success('Logged in successfully');
             onOpenChange(false);
-            setEmail('');
             setPassword('');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to login');
+        } catch (error) {
+            const authError = error as { message: string };
+            toast.error(authError.message || 'Failed to login');
         } finally {
             setIsLoading(false);
         }

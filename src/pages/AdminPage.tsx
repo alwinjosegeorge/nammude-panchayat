@@ -49,6 +49,7 @@ export default function AdminPage() {
     urgency: 'all',
     category: 'all',
     search: '',
+    panchayat: '',
   });
   const [newNote, setNewNote] = useState('');
 
@@ -79,6 +80,7 @@ export default function AdminPage() {
     if (filters.status !== 'all' && report.status !== filters.status) return false;
     if (filters.urgency !== 'all' && report.urgency !== filters.urgency) return false;
     if (filters.category !== 'all' && report.category !== filters.category) return false;
+    if (filters.panchayat && !report.panchayat.toLowerCase().includes(filters.panchayat.toLowerCase())) return false;
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       return (
@@ -614,12 +616,12 @@ export default function AdminPage() {
                   <h3 className="text-sm font-medium text-muted-foreground mb-3">{t.urgencyLevel}</h3>
                   <div className="flex gap-2">
                     {/* ... keeping urgency buttons ... */}
-                    {['normal', 'high', 'urgent'].map((u) => (
+                    {(['normal', 'high', 'urgent'] as const).map((u) => (
                       <button
                         key={u}
-                        onClick={() => api.updateIssue(selectedReport.id, { urgency: u as any }).then(() => {
-                          setReports(reports.map(r => r.id === selectedReport.id ? { ...r, urgency: u as any } : r));
-                          setSelectedReport({ ...selectedReport, urgency: u as any });
+                        onClick={() => api.updateIssue(selectedReport.id, { urgency: u }).then(() => {
+                          setReports(reports.map(r => r.id === selectedReport.id ? { ...r, urgency: u } : r));
+                          setSelectedReport({ ...selectedReport, urgency: u });
                         })}
                         className={cn(
                           "flex-1 py-2 text-xs font-medium rounded-md border transition-all",

@@ -109,3 +109,27 @@ export const categoryIcons: Record<Category, string> = {
   publicProperty: '🏛️',
   other: '📋',
 };
+
+export interface DBReport {
+  id: string;
+  tracking_id: string;
+  title: string;
+  description: string;
+  category: string; // Database type might be text, casting to Category in map function
+  panchayat: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+  urgency: string; // Database text
+  photos: string[];
+  status: string;
+  contact_phone?: string;
+  contact_email?: string;
+  anonymous: boolean;
+  assigned_team?: string;
+  assigned_team_id?: string;
+  history: TimelineEntry[]; // JSONB in DB
+  internal_notes?: InternalNote[]; // JSONB
+  created_at: string;
+  updated_at: string;
+}

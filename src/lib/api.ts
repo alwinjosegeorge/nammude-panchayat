@@ -1,31 +1,33 @@
 import { supabase } from './supabase';
-import { Report, Status, InternalNote, TeamEntity } from './types';
+import { Report, Status, InternalNote, TeamEntity, DBReport, Category, Urgency, Team } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to convert DB (snake_case) to Frontend (camelCase)
-const mapToReport = (data: any): Report => ({
+// Helper to convert DB (snake_case) to Frontend (camelCase)
+const mapToReport = (data: DBReport): Report => ({
     id: data.id,
     trackingId: data.tracking_id,
     title: data.title,
     description: data.description,
-    category: data.category,
+    category: data.category as Category, // Cast to Category
     panchayat: data.panchayat,
     address: data.address,
     lat: data.lat,
     lng: data.lng,
-    urgency: data.urgency,
+    urgency: data.urgency as Urgency, // Cast to Urgency
     photos: data.photos || [],
-    status: data.status,
+    status: data.status as Status,
     contact: (data.contact_phone || data.contact_email) ? {
         phone: data.contact_phone,
         email: data.contact_email,
     } : undefined,
     anonymous: data.anonymous,
-    assignedTeam: data.assigned_team,
+    assignedTeam: data.assigned_team as Team,
+    assignedTeamId: data.assigned_team_id,
     history: data.history || [],
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    internalNotes: data.internal_notes || [], // Assuming internal_notes column wasn't created yet, but handling it just in case or ignored
+    internalNotes: data.internal_notes || [],
 });
 
 // Helper to upload a single photo
@@ -131,14 +133,14 @@ export const api = {
 
     // Admin: Generic Update
     updateIssue: async (id: string, updates: Partial<Report>) => {
-        const dbUpdates: any = {
+        const dbUpdates: Partial<DBReport> = {
             updated_at: new Date().toISOString(),
         };
 
         if (updates.status) dbUpdates.status = updates.status;
         if (updates.history) dbUpdates.history = updates.history;
         if (updates.assignedTeam) dbUpdates.assigned_team = updates.assignedTeam;
-        if (updates.internalNotes) dbUpdates.internal_notes = updates.internalNotes; // JSONB handling
+        if (updates.internalNotes) dbUpdates.internal_notes = updates.internalNotes;
 
         const { error } = await supabase
             .from('report_issue')

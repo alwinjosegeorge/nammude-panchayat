@@ -32,6 +32,12 @@ export function LocationMap({
   const markerRef = useRef<L.Marker | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Refs for callbacks to avoid stale closures in event listeners
+  const onLocationChangeRef = useRef(onLocationChange);
+  useEffect(() => {
+    onLocationChangeRef.current = onLocationChange;
+  }, [onLocationChange]);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -49,33 +55,75 @@ export function LocationMap({
     }).addTo(map);
 
     // Add marker only if we have valid coordinates, OR if we want to show a starting marker
-    // Let's show a marker at center but make it movable
     const marker = L.marker([initialLat, initialLng], {
       icon: defaultIcon,
       draggable: draggable
     }).addTo(map);
     markerRef.current = marker;
 
-    if (draggable) {
-      marker.on('dragend', () => {
-        const position = marker.getLatLng();
-        onLocationChange?.(position.lat, position.lng);
-      });
+    // Event listeners
+    marker.on('dragend', () => {
+      const position = marker.getLatLng();
+      onLocationChangeRef.current?.(position.lat, position.lng);
+    });
 
-      // Add click to pick
-      map.on('click', (e) => {
-        const { lat, lng } = e.latlng;
-        marker.setLatLng([lat, lng]);
-        onLocationChange?.(lat, lng);
-      });
-    }
+    map.on('click', (e) => {
+      if (!marker.dragging?.enabled()) return;
+      // Only allow click-to-move if draggable is true? 
+      // The original code checked 'if (draggable)' outside.
+      // We handle that via the effect below or check ref?
+      // Let's use the prop passed to the closure, but that's stale?
+      // Actually, let's just re-implement the drill:
+      // logic was: if (draggable) setup listeners.
+      // But if draggable changes, we need to remove listeners? Leaflet is tricky with removing anonymous listeners.
+      // Easier: check draggableRef inside listener?
+    });
+
+    // We'll set up a robust click handler using the ref pattern as well if needed.
+    // But simplistic approach:
 
     return () => {
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Init only
+
+  // Handle draggable updates
+  useEffect(() => {
+    if (!markerRef.current || !mapRef.current) return;
+
+    const marker = markerRef.current;
+
+    if (draggable) {
+      marker.dragging?.enable();
+      // Since we can't easily add/remove listeners without storing the function reference,
+      // we might stick to always having the listener but checking condition inside.
+    } else {
+      marker.dragging?.disable();
+    }
+  }, [draggable]);
+
+  // Handle click to move logic (needs to be aware of draggable)
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current) return;
+    const map = mapRef.current;
+    const marker = markerRef.current;
+
+    const clickHandler = (e: L.LeafletMouseEvent) => {
+      if (!draggable) return;
+      const { lat, lng } = e.latlng;
+      marker.setLatLng([lat, lng]);
+      onLocationChangeRef.current?.(lat, lng);
+    };
+
+    map.on('click', clickHandler);
+    return () => {
+      map.off('click', clickHandler);
+    };
+  }, [draggable]);
+
 
   // Update map view and marker when lat/lng changes
   // Update map view and marker when lat/lng changes

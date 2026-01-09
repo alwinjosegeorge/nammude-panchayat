@@ -21,15 +21,7 @@ export default function TrackPage() {
   const [searched, setSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const id = searchParams.get('id');
-    if (id) {
-      setTrackingId(id);
-      handleSearch(id);
-    }
-  }, [searchParams]);
-
-  const handleSearch = async (id?: string) => {
+  const handleSearch = useCallback(async (id?: string) => {
     const searchId = id || trackingId;
     if (!searchId.trim()) return;
 
@@ -42,7 +34,15 @@ export default function TrackPage() {
     setReport(found);
     setIsLoading(false);
     // }, 500);
-  };
+  }, [trackingId]);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id) {
+      setTrackingId(id);
+      handleSearch(id);
+    }
+  }, [searchParams, handleSearch]);
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
