@@ -1,0 +1,72 @@
+﻿node.exe : 
+[31mfailed to load 
+config from C:\Users\
+there\Downloads\nammu
+de-panchayat\vite.con
+fig.ts[39m
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: ([31mfa   
+ iled to ....conf    
+ig.ts[39m:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+[31merror during 
+build:
+Error: Failed to 
+load native binding
+    at 
+Object.<anonymous> (C
+:\Users\there\Downloa
+ds\nammude-panchayat\
+node_modules\@swc\cor
+e\binding.js:333:11)
+    at 
+Module._compile (node
+:internal/modules/cjs
+/loader:1761:14)
+    at Object..js (no
+de:internal/modules/c
+js/loader:1893:10)
+    at Module.load (n
+ode:internal/modules/
+cjs/loader:1481:32)
+    at Module._load (
+node:internal/modules
+/cjs/loader:1300:12)
+    at TracingChannel
+.traceSync (node:diag
+nostics_channel:328:1
+4)
+    at 
+wrapModuleLoad (node:
+internal/modules/cjs/
+loader:245:24)
+    at 
+Module.require (node:
+internal/modules/cjs/
+loader:1504:12)
+    at require (node:
+internal/modules/help
+ers:152:16)
+    at 
+Object.<anonymous> (C
+:\Users\there\Downloa
+ds\nammude-panchayat\
+node_modules\@swc\cor
+e\index.js:49:17)[39
+m
