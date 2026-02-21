@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { CategorySelector } from '@/components/CategorySelector';
+import { SectorSelector } from '@/components/SectorSelector';
+import { IssueTypeSelector } from '@/components/IssueTypeSelector';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { LocationMap } from '@/components/LocationMap';
 import { detectLocation, reverseGeocode } from '@/lib/geocoding';
 import { api } from '@/lib/api';
-import { Category, Urgency, Report, categoryToTeam, LocationData as BaseLocationData } from '@/lib/types';
+import { Category, Urgency, Report, LocationData as BaseLocationData } from '@/lib/types';
+import { issueTypeToCategory, issueTypeToTeam, getSectorByKey } from '@/lib/sectors';
 import { cn } from '@/lib/utils';
 import { MapPin, Camera, X, Upload, Loader2, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,8 +34,15 @@ export default function ReportPage() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
 
+  // Sector / Issue Type state (new two-step flow)
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
+  const [customIssueText, setCustomIssueText] = useState('');
+
+  // Derived category/team from issue type (backward compat)
+  const category: Category | null = selectedIssueType ? issueTypeToCategory(selectedIssueType) : null;
+
   // Form state
-  const [category, setCategory] = useState<Category | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<District | ''>('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -149,7 +158,7 @@ export default function ReportPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!category || !title || !description || !location) {
+    if (!selectedSector || !selectedIssueType || !title || !description || !location) {
       toast.error(language === 'en' ? 'Please fill all required fields' : 'എല്ലാ ആവശ്യമായ ഫീൽഡുകളും പൂരിപ്പിക്കുക');
       return;
     }
@@ -162,7 +171,7 @@ export default function ReportPage() {
       // Feature 4: Duplicate detection before submit
       if (location.lat && location.lng && location.lat !== 0 && location.lng !== 0) {
         try {
-          const duplicate = await api.checkDuplicate(location.lat, location.lng, category);
+          const duplicate = await api.checkDuplicate(location.lat, location.lng, selectedIssueType);
           if (duplicate && !showDuplicateDialog) {
             // Show duplicate dialog instead of submitting
             setDuplicateInfo(duplicate);
@@ -184,7 +193,9 @@ export default function ReportPage() {
         id: uuidv4(),
         trackingId: newTrackingId,
         category,
-        title,
+        sector: selectedSector,
+        issueType: selectedIssueType,
+        title: selectedSector === 'other' && customIssueText ? customIssueText : title,
         description,
         panchayat: location.panchayat,
         address: location.address,
@@ -194,8 +205,8 @@ export default function ReportPage() {
         photos,
         contact: anonymous ? undefined : { phone: phone || undefined, email: email || undefined },
         anonymous,
-        status: 'notTaken', // Feature 1: Auto status
-        assignedTeam: categoryToTeam[category],
+        status: 'notTaken',
+        assignedTeam: issueTypeToTeam(selectedIssueType),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         history: [
@@ -284,7 +295,9 @@ export default function ReportPage() {
                 variant="outline"
                 onClick={() => {
                   setSubmitted(false);
-                  setCategory(null);
+                  setSelectedSector(null);
+                  setSelectedIssueType(null);
+                  setCustomIssueText('');
                   setTitle('');
                   setDescription('');
                   setPhotos([]);
@@ -391,12 +404,32 @@ export default function ReportPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Category Selection */}
+            {/* STEP 1 or STEP 2: Sector → Issue Type two-step selection */}
             <div className="space-y-3">
-              <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                {t.selectCategory} *
-              </label>
-              <CategorySelector value={category} onChange={setCategory} />
+              {!selectedSector ? (
+                /* STEP 1: Sector grid */
+                <SectorSelector
+                  onSelect={(sectorKey) => {
+                    setSelectedSector(sectorKey);
+                    setSelectedIssueType(null);
+                  }}
+                  selectedSector={selectedSector}
+                />
+              ) : (
+                /* STEP 2: Issue type list for chosen sector */
+                <IssueTypeSelector
+                  sectorKey={selectedSector}
+                  sectorLabel={t.sectors?.[selectedSector as keyof typeof t.sectors] ?? selectedSector}
+                  selectedIssueType={selectedIssueType}
+                  onSelect={setSelectedIssueType}
+                  onBack={() => {
+                    setSelectedSector(null);
+                    setSelectedIssueType(null);
+                  }}
+                  customText={customIssueText}
+                  onCustomTextChange={setCustomIssueText}
+                />
+              )}
             </div>
 
             {/* Title */}

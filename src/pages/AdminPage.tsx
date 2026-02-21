@@ -10,6 +10,10 @@ import { StatusBadge, UrgencyBadge, PriorityBadge, EscalationBadge } from '@/com
 import { api } from '@/lib/api';
 import { getEscalationInfo } from '@/lib/automation';
 import { Report, Status, Team, Category, categoryIcons, InternalNote, TeamEntity } from '@/lib/types';
+import { getSectorIcon, getIssueTypeIcon, SECTORS, getIssueTypesForSector } from '@/lib/sectors';
+import { SectorAnalytics } from '@/components/SectorAnalytics';
+import { SectorHeatmap } from '@/components/SectorHeatmap';
+import { SectorTrend } from '@/components/SectorTrend';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -46,12 +50,21 @@ export default function AdminPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    status: 'all',
-    urgency: 'all',
-    category: 'all',
+    status: 'all' as Status | 'all',
+    urgency: 'all' as 'normal' | 'high' | 'urgent' | 'all',
+    sector: 'all',
+    issueType: 'all',
+    priority: 'all' as 'Low' | 'Medium' | 'High' | 'all',
     search: '',
     panchayat: '',
   });
+
+  /** Heatmap drill-down: jump to list view with sector pre-applied */
+  const handleHeatmapDrillDown = (sectorKey: string) => {
+    setFilters(f => ({ ...f, sector: sectorKey, issueType: 'all' }));
+    setViewMode('list');
+    setShowFilters(true);
+  };
   const [newNote, setNewNote] = useState('');
 
   useEffect(() => {
@@ -87,7 +100,9 @@ export default function AdminPage() {
   const filteredReports = reports.filter(report => {
     if (filters.status !== 'all' && report.status !== filters.status) return false;
     if (filters.urgency !== 'all' && report.urgency !== filters.urgency) return false;
-    if (filters.category !== 'all' && report.category !== filters.category) return false;
+    if (filters.sector !== 'all' && report.sector !== filters.sector) return false;
+    if (filters.issueType !== 'all' && report.issueType !== filters.issueType) return false;
+    if (filters.priority !== 'all' && report.priorityLevel !== filters.priority) return false;
     if (filters.panchayat && !report.panchayat.toLowerCase().includes(filters.panchayat.toLowerCase())) return false;
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -100,6 +115,11 @@ export default function AdminPage() {
     }
     return true;
   });
+
+  // Dynamic issue type list based on chosen sector filter
+  const issueTypeOptions = filters.sector === 'all'
+    ? SECTORS.flatMap(s => s.issueTypes)
+    : getIssueTypesForSector(filters.sector);
 
   const stats = {
     total: reports.length,
@@ -360,47 +380,99 @@ export default function AdminPage() {
                 </div>
 
                 {showFilters && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border animate-slide-up">
-                    <select
-                      value={filters.status}
-                      onChange={(e) => setFilters({ ...filters, status: e.target.value as Status | '' })}
-                      className="input-field text-sm"
-                    >
-                      <option value="">{language === 'en' ? 'All Status' : 'എല്ലാ സ്റ്റാറ്റസും'}</option>
-                      {(['submitted', 'received', 'assigned', 'inProgress', 'resolved', 'closed'] as Status[]).map((s) => (
-                        <option key={s} value={s}>{t.status[s]}</option>
-                      ))}
-                    </select>
+                  <div className="space-y-3 mt-4 pt-4 border-t border-border animate-slide-up">
+                    {/* Row 1: Status, Urgency, Priority */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <select
+                        value={filters.status}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value as Status | 'all' })}
+                        className="input-field text-sm"
+                      >
+                        <option value="all">{language === 'en' ? 'All Status' : 'എല്ലാ സ്റ്റാറ്റസും'}</option>
+                        {(['notTaken', 'submitted', 'received', 'underReview', 'assigned', 'inProgress', 'resolved', 'completed', 'closed'] as Status[]).map((s) => (
+                          <option key={s} value={s}>{t.status[s]}</option>
+                        ))}
+                      </select>
 
-                    <select
-                      value={filters.category}
-                      onChange={(e) => setFilters({ ...filters, category: e.target.value as Category | '' })}
-                      className="input-field text-sm"
-                    >
-                      <option value="">{language === 'en' ? 'All Categories' : 'എല്ലാ വിഭാഗങ്ങളും'}</option>
-                      {Object.keys(t.categories).map((c) => (
-                        <option key={c} value={c}>{t.categories[c as keyof typeof t.categories]}</option>
-                      ))}
-                    </select>
+                      <select
+                        value={filters.urgency}
+                        onChange={(e) => setFilters({ ...filters, urgency: e.target.value as 'normal' | 'high' | 'urgent' | 'all' })}
+                        className="input-field text-sm"
+                      >
+                        <option value="all">{language === 'en' ? 'All Urgency' : 'എല്ലാ അടിയന്തരാവസ്ഥയും'}</option>
+                        <option value="normal">{t.normal}</option>
+                        <option value="high">{t.high}</option>
+                        <option value="urgent">{t.urgent}</option>
+                      </select>
 
-                    <select
-                      value={filters.urgency}
-                      onChange={(e) => setFilters({ ...filters, urgency: e.target.value as 'normal' | 'high' | 'urgent' | '' })}
-                      className="input-field text-sm"
-                    >
-                      <option value="">{language === 'en' ? 'All Urgency' : 'എല്ലാ അടിയന്തരാവസ്ഥയും'}</option>
-                      <option value="normal">{t.normal}</option>
-                      <option value="high">{t.high}</option>
-                      <option value="urgent">{t.urgent}</option>
-                    </select>
+                      <select
+                        value={filters.priority}
+                        onChange={(e) => setFilters({ ...filters, priority: e.target.value as 'Low' | 'Medium' | 'High' | 'all' })}
+                        className="input-field text-sm"
+                      >
+                        <option value="all">{language === 'en' ? 'All Priority' : 'എല്ലാ മുൻഗണനയും'}</option>
+                        <option value="High">{language === 'en' ? '🔴 High' : '🔴 ഉയർന്നത്'}</option>
+                        <option value="Medium">{language === 'en' ? '🟡 Medium' : '🟡 ഇടത്തരം'}</option>
+                        <option value="Low">{language === 'en' ? '🟢 Low' : '🟢 കുറഞ്ഞത്'}</option>
+                      </select>
+                    </div>
 
-                    <input
-                      type="text"
-                      value={filters.panchayat}
-                      onChange={(e) => setFilters({ ...filters, panchayat: e.target.value })}
-                      placeholder={language === 'en' ? 'Search Panchayat...' : 'പഞ്ചായത്ത് തിരയുക...'}
-                      className="input-field text-sm"
-                    />
+                    {/* Row 2: Sector, Issue Type, Panchayat */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <select
+                        value={filters.sector}
+                        onChange={(e) => setFilters({ ...filters, sector: e.target.value, issueType: 'all' })}
+                        className="input-field text-sm"
+                      >
+                        <option value="all">{language === 'en' ? 'All Sectors' : 'എല്ലാ സെക്ടറും'}</option>
+                        {SECTORS.map(s => (
+                          <option key={s.key} value={s.key}>
+                            {s.icon} {(t as any).sectors?.[s.key] ?? s.key}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={filters.issueType}
+                        onChange={(e) => setFilters({ ...filters, issueType: e.target.value })}
+                        className="input-field text-sm"
+                        disabled={issueTypeOptions.length === 0}
+                      >
+                        <option value="all">{language === 'en' ? 'All Issue Types' : 'എല്ലാ ഇഷ്യൂ ടൈപ്പും'}</option>
+                        {issueTypeOptions.map(it => (
+                          <option key={it.key} value={it.key}>
+                            {it.icon} {(t as any).issueTypes?.[it.key] ?? it.key}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        type="text"
+                        value={filters.panchayat}
+                        onChange={(e) => setFilters({ ...filters, panchayat: e.target.value })}
+                        placeholder={language === 'en' ? 'Search Panchayat...' : 'പഞ്ചായത്ത് തിരയുക...'}
+                        className="input-field text-sm"
+                      />
+                    </div>
+
+                    {/* Active filter pills + clear */}
+                    {(filters.status !== 'all' || filters.urgency !== 'all' || filters.sector !== 'all' || filters.issueType !== 'all' || filters.priority !== 'all' || filters.panchayat || filters.search) && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <span className="text-xs text-muted-foreground">{language === 'en' ? 'Active:' : 'സജീവം:'}</span>
+                        {filters.status !== 'all' && <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border">{t.status[filters.status as keyof typeof t.status]}</span>}
+                        {filters.urgency !== 'all' && <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border">{filters.urgency}</span>}
+                        {filters.priority !== 'all' && <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border">{filters.priority}</span>}
+                        {filters.sector !== 'all' && <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border">{(t as any).sectors?.[filters.sector] ?? filters.sector}</span>}
+                        {filters.issueType !== 'all' && <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border">{(t as any).issueTypes?.[filters.issueType] ?? filters.issueType}</span>}
+                        {filters.panchayat && <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border">{filters.panchayat}</span>}
+                        <button
+                          onClick={() => setFilters({ status: 'all', urgency: 'all', sector: 'all', issueType: 'all', priority: 'all', search: '', panchayat: '' })}
+                          className="text-xs text-destructive hover:underline ml-1"
+                        >
+                          {language === 'en' ? 'Clear all' : 'എല്ലാം മായ്ക്കുക'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -437,7 +509,13 @@ export default function AdminPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <span className="text-lg">{categoryIcons[report.category]}</span>
+                                <span className="text-lg">
+                                  {report.issueType
+                                    ? getIssueTypeIcon(report.issueType)
+                                    : report.sector
+                                      ? getSectorIcon(report.sector)
+                                      : categoryIcons[report.category]}
+                                </span>
                                 <span className="font-medium text-foreground line-clamp-1 max-w-48">{report.title}</span>
                               </div>
                             </td>
@@ -491,87 +569,56 @@ export default function AdminPage() {
 
           {/* Analytics View */}
           {viewMode === 'analytics' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Category Distribution */}
+            <div className="space-y-6">
+              {/* Overall donut stays as summary header */}
               <div className="card-elevated p-6">
                 <h3 className={cn(
-                  "font-semibold text-foreground mb-4",
-                  language === 'ml' && "font-malayalam"
+                  'font-semibold text-foreground mb-4',
+                  language === 'ml' && 'font-malayalam'
                 )}>
-                  {language === 'en' ? 'Complaints by Category' : 'വിഭാഗം അനുസരിച്ച് പരാതികൾ'}
+                  {language === 'en' ? 'Overall Resolution Overview' : 'മൊത്തം പരിഹാര അവലോകനം'}
                 </h3>
-              </div>
-
-              {/* Status Distribution */}
-              <div className="card-elevated p-6">
-                <h3 className={cn(
-                  "font-semibold text-foreground mb-4",
-                  language === 'ml' && "font-malayalam"
-                )}>
-                  {language === 'en' ? 'Resolution Overview' : 'പരിഹാര അവലോകനം'}
-                </h3>
-                <div className="flex items-center justify-center py-8">
-                  <div className="relative w-48 h-48">
+                <div className="flex flex-wrap items-center justify-center gap-10">
+                  <div className="relative w-36 h-36 flex-shrink-0">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                      {/* Pending */}
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke="hsl(var(--warning))"
-                        strokeWidth="20"
-                        strokeDasharray={`${(stats.pending / stats.total) * 251.2} 251.2`}
-                        strokeLinecap="round"
-                      />
-                      {/* In Progress */}
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke="hsl(var(--accent))"
-                        strokeWidth="20"
-                        strokeDasharray={`${(stats.inProgress / stats.total) * 251.2} 251.2`}
-                        strokeDashoffset={`-${(stats.pending / stats.total) * 251.2}`}
-                        strokeLinecap="round"
-                      />
-                      {/* Resolved */}
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke="hsl(var(--success))"
-                        strokeWidth="20"
-                        strokeDasharray={`${(stats.resolved / stats.total) * 251.2} 251.2`}
-                        strokeDashoffset={`-${((stats.pending + stats.inProgress) / stats.total) * 251.2}`}
-                        strokeLinecap="round"
-                      />
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--warning))" strokeWidth="20"
+                        strokeDasharray={`${stats.total > 0 ? (stats.pending / stats.total) * 251.2 : 0} 251.2`} strokeLinecap="round" />
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--accent))" strokeWidth="20"
+                        strokeDasharray={`${stats.total > 0 ? (stats.inProgress / stats.total) * 251.2 : 0} 251.2`}
+                        strokeDashoffset={`-${stats.total > 0 ? (stats.pending / stats.total) * 251.2 : 0}`} strokeLinecap="round" />
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--success))" strokeWidth="20"
+                        strokeDasharray={`${stats.total > 0 ? (stats.resolved / stats.total) * 251.2 : 0} 251.2`}
+                        strokeDashoffset={`-${stats.total > 0 ? ((stats.pending + stats.inProgress) / stats.total) * 251.2 : 0}`} strokeLinecap="round" />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-3xl font-bold text-foreground">{stats.total}</span>
                       <span className="text-xs text-muted-foreground">Total</span>
                     </div>
                   </div>
-                </div>
-                <div className="flex justify-center gap-6 mt-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-warning" />
-                    <span className="text-sm text-muted-foreground">Pending ({stats.pending})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-accent" />
-                    <span className="text-sm text-muted-foreground">In Progress ({stats.inProgress})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-success" />
-                    <span className="text-sm text-muted-foreground">Resolved ({stats.resolved})</span>
+                  <div className="flex flex-col gap-3">
+                    {[{ color: 'bg-warning', label: `Pending`, val: stats.pending }, { color: 'bg-accent', label: 'In Progress', val: stats.inProgress }, { color: 'bg-success', label: 'Resolved', val: stats.resolved }].map(item => (
+                      <div key={item.label} className="flex items-center gap-3">
+                        <div className={cn('w-3 h-3 rounded-full flex-shrink-0', item.color)} />
+                        <span className="text-sm text-muted-foreground w-24">{item.label}</span>
+                        <span className="font-semibold text-foreground">{item.val}</span>
+                        <span className="text-xs text-muted-foreground">{stats.total > 0 ? Math.round(item.val / stats.total * 100) : 0}%</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
+
+              {/* Sector Analytics — bar chart + performance cards */}
+              <SectorAnalytics reports={reports} />
+
+              {/* Sector Heatmap — clickable drill-down */}
+              <SectorHeatmap reports={reports} onSectorClick={handleHeatmapDrillDown} />
+
+              {/* Sector Trend & Ward Breakdown */}
+              <SectorTrend reports={reports} />
             </div>
           )}
+
         </div>
       </main>
 
@@ -604,9 +651,24 @@ export default function AdminPage() {
                     isDelayed={selectedReport.isDelayed}
                     isCritical={selectedReport.isCritical}
                   />
-                  <span className="status-badge bg-secondary text-secondary-foreground">
-                    {categoryIcons[selectedReport.category]} {t.categories[selectedReport.category as keyof typeof t.categories]}
-                  </span>
+                  {selectedReport.sector ? (
+                    <>
+                      <span className="status-badge bg-secondary text-secondary-foreground">
+                        {getSectorIcon(selectedReport.sector)}{' '}
+                        {(t as any).sectors?.[selectedReport.sector] ?? selectedReport.sector}
+                      </span>
+                      {selectedReport.issueType && (
+                        <span className="status-badge bg-secondary/70 text-secondary-foreground">
+                          {getIssueTypeIcon(selectedReport.issueType)}{' '}
+                          {(t as any).issueTypes?.[selectedReport.issueType] ?? selectedReport.issueType}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="status-badge bg-secondary text-secondary-foreground">
+                      {categoryIcons[selectedReport.category]} {t.categories[selectedReport.category as keyof typeof t.categories]}
+                    </span>
+                  )}
                   {selectedReport.supportCount != null && selectedReport.supportCount > 0 && (
                     <span className="status-badge bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                       👥 {selectedReport.supportCount} {t.supportCount || 'supporters'}

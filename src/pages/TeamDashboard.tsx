@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { Report, Status, categoryIcons, TeamEntity } from '@/lib/types';
+import { getSectorIcon, getIssueTypeIcon } from '@/lib/sectors';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
@@ -92,7 +93,13 @@ export default function TeamDashboard() {
                                         </div>
                                     </div>
                                     <h3 className="font-medium flex items-center gap-2 mb-2">
-                                        <span>{categoryIcons[report.category]}</span>
+                                        <span>
+                                            {report.issueType
+                                                ? getIssueTypeIcon(report.issueType)
+                                                : report.sector
+                                                    ? getSectorIcon(report.sector)
+                                                    : categoryIcons[report.category]}
+                                        </span>
                                         {report.title}
                                     </h3>
                                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -122,7 +129,7 @@ export default function TeamDashboard() {
                                     <PriorityBadge level={selectedReport.priorityLevel} score={selectedReport.priorityScore} />
                                     <EscalationBadge isDelayed={selectedReport.isDelayed} isCritical={selectedReport.isCritical} />
                                     <span className="text-xs border px-2 py-1 rounded-full bg-secondary">
-                                        {selectedReport.category}
+                                        {selectedReport.issueType || selectedReport.sector || selectedReport.category}
                                     </span>
                                 </div>
 

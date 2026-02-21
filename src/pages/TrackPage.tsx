@@ -9,6 +9,7 @@ import { formatResolutionTime } from '@/lib/automation';
 import { Timeline } from '@/components/Timeline';
 import { api } from '@/lib/api';
 import { Report, categoryIcons } from '@/lib/types';
+import { getSectorIcon, getIssueTypeIcon } from '@/lib/sectors';
 import { cn } from '@/lib/utils';
 import { Search, MapPin, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -115,7 +116,13 @@ export default function TrackPage() {
                   <div className="card-elevated p-6">
                     <div className="flex items-start justify-between gap-4 mb-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-3xl">{categoryIcons[report.category]}</span>
+                        <span className="text-3xl">
+                          {report.issueType
+                            ? getIssueTypeIcon(report.issueType)
+                            : report.sector
+                              ? getSectorIcon(report.sector)
+                              : categoryIcons[report.category]}
+                        </span>
                         <div>
                           <span className="text-sm font-mono text-muted-foreground">{report.trackingId}</span>
                           <h2 className="text-xl font-semibold text-foreground">{report.title}</h2>
@@ -150,12 +157,33 @@ export default function TrackPage() {
                       <UrgencyBadge urgency={report.urgency} />
                       <PriorityBadge level={report.priorityLevel} />
                       <EscalationBadge isDelayed={report.isDelayed} isCritical={report.isCritical} />
-                      <span className={cn(
-                        "status-badge bg-secondary text-secondary-foreground",
-                        language === 'ml' && "font-malayalam"
-                      )}>
-                        {t.categories[report.category as keyof typeof t.categories]}
-                      </span>
+                      {report.sector && t.sectors ? (
+                        <>
+                          <span className={cn(
+                            'status-badge bg-secondary text-secondary-foreground',
+                            language === 'ml' && 'font-malayalam'
+                          )}>
+                            {getSectorIcon(report.sector)}{' '}
+                            {t.sectors[report.sector as keyof typeof t.sectors] ?? report.sector}
+                          </span>
+                          {report.issueType && t.issueTypes && (
+                            <span className={cn(
+                              'status-badge bg-secondary/70 text-secondary-foreground',
+                              language === 'ml' && 'font-malayalam'
+                            )}>
+                              {getIssueTypeIcon(report.issueType)}{' '}
+                              {t.issueTypes[report.issueType as keyof typeof t.issueTypes] ?? report.issueType}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className={cn(
+                          'status-badge bg-secondary text-secondary-foreground',
+                          language === 'ml' && 'font-malayalam'
+                        )}>
+                          {t.categories[report.category as keyof typeof t.categories]}
+                        </span>
+                      )}
                       {report.assignedTeam && (
                         <span className="status-badge bg-primary/10 text-primary">
                           {t.teams[report.assignedTeam as keyof typeof t.teams]}

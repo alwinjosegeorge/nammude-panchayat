@@ -40,6 +40,8 @@ export interface Report {
   id: string;
   trackingId: string;
   category: Category;
+  sector?: string;
+  issueType?: string;
   title: string;
   description: string;
   panchayat: string;
@@ -144,6 +146,8 @@ export interface DBReport {
   title: string;
   description: string;
   category: string; // Database type might be text, casting to Category in map function
+  sector?: string;
+  issue_type?: string;
   panchayat: string;
   address: string;
   lat?: number;
