@@ -13,14 +13,16 @@ import { Report } from '@/lib/types';
 
 export default function HomePage() {
   const { t, language } = useLanguage();
-  const [reports, setReports] = useState<Report[]>([]);
+  const [allReports, setAllReports] = useState<Report[]>([]);
+  const [recentReports, setRecentReports] = useState<Report[]>([]);
 
   useEffect(() => {
     const fetchReports = async () => {
       try {
         const data = await api.getPublicIssues();
         if (data) {
-          setReports(data.slice(0, 5)); // Keep limit to recent 5
+          setAllReports(data);              // full list for stats
+          setRecentReports(data.slice(0, 5)); // most recent 5 for display
         }
       } catch (error) {
         console.error('Failed to fetch reports:', error);
@@ -30,9 +32,9 @@ export default function HomePage() {
   }, []);
 
   const stats = {
-    total: reports.length,
-    resolved: reports.filter(r => r.status === 'resolved' || r.status === 'closed').length,
-    inProgress: reports.filter(r => r.status === 'inProgress').length,
+    total: allReports.length,
+    resolved: allReports.filter(r => r.status === 'resolved' || r.status === 'closed').length,
+    inProgress: allReports.filter(r => r.status === 'inProgress').length,
   };
 
   return (
@@ -184,7 +186,7 @@ export default function HomePage() {
                 {t.publicIssuesMap}
               </h2>
             </div>
-            <IssuesMap reports={reports} className="h-80 md:h-96 rounded-lg" />
+            <IssuesMap reports={recentReports} className="h-80 md:h-96 rounded-lg" />
           </div>
         </section>
 
@@ -198,7 +200,7 @@ export default function HomePage() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {reports.map((report, index) => (
+            {recentReports.map((report, index) => (
               <Link
                 key={report.id}
                 to={`/track?id=${report.trackingId}`}
