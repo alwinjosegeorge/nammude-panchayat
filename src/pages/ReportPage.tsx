@@ -158,7 +158,7 @@ export default function ReportPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedSector || !selectedIssueType || !title || !description || !location) {
+    if (!selectedSector || !selectedIssueType || !description || !location) {
       toast.error(language === 'en' ? 'Please fill all required fields' : 'എല്ലാ ആവശ്യമായ ഫീൽഡുകളും പൂരിപ്പിക്കുക');
       return;
     }
@@ -195,7 +195,9 @@ export default function ReportPage() {
         category,
         sector: selectedSector,
         issueType: selectedIssueType,
-        title: selectedSector === 'other' && customIssueText ? customIssueText : title,
+        title: customIssueText
+          ? customIssueText
+          : `${(t as any).sectors?.[selectedSector] ?? selectedSector} — ${(t as any).issueTypes?.[selectedIssueType] ?? selectedIssueType}`,
         description,
         panchayat: location.panchayat,
         address: location.address,
@@ -432,21 +434,7 @@ export default function ReportPage() {
               )}
             </div>
 
-            {/* Title */}
-            <div className="space-y-2">
-              <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                {t.issueTitle} *
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value.slice(0, 50))}
-                placeholder={t.issueTitlePlaceholder}
-                className={cn("input-field", language === 'ml' && "font-malayalam")}
-                maxLength={50}
-              />
-              <p className="text-xs text-muted-foreground text-right">{title.length}/50</p>
-            </div>
+
 
             {/* Description */}
             <div className="space-y-2">
