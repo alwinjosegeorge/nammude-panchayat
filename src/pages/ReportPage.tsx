@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Header } from '@/components/Header';
@@ -12,10 +12,11 @@ import { api } from '@/lib/api';
 import { Category, Urgency, Report, LocationData as BaseLocationData } from '@/lib/types';
 import { issueTypeToCategory, issueTypeToTeam, getSectorByKey } from '@/lib/sectors';
 import { cn } from '@/lib/utils';
-import { MapPin, Camera, X, Upload, Loader2, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+import { MapPin, Camera, X, Upload, Loader2, CheckCircle, Copy, AlertTriangle, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+import { useSpeechToText, SPEECH_LANGS } from '@/hooks/useSpeechToText';
 import {
   KERALA_DISTRICTS,
   KERALA_PANCHAYATS,
@@ -29,6 +30,98 @@ interface LocationData extends BaseLocationData {
 const generateTrackingId = () => {
   return 'TRK' + Math.floor(100000 + Math.random() * 900000).toString();
 };
+
+// ── DescriptionField — textarea + mic voice input ─────────────────────────
+interface DescriptionFieldProps {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  label: string;
+  language: string;
+}
+
+function DescriptionField({ value, onChange, placeholder, label, language }: DescriptionFieldProps) {
+  const { isListening, lang, setLang, supported, start, stop } = useSpeechToText({
+    onResult: (text) => {
+      // Append transcript to existing text (with space separator if needed)
+      onChange(value ? `${value} ${text}` : text);
+    },
+    onError: (err) => {
+      toast.error(err);
+    },
+  });
+
+  const ml = language === 'ml';
+
+  return (
+    <div className="space-y-2">
+      {/* Label row */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className={cn('label-text', ml && 'font-malayalam')}>
+          {label} *
+        </label>
+
+        {supported && (
+          <div className="flex items-center gap-1.5">
+            {/* Language selector pills */}
+            {SPEECH_LANGS.map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                onClick={() => setLang(l.code)}
+                className={cn(
+                  'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
+                  lang === l.code
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
+                )}
+                title={`Record in ${l.label}`}
+              >
+                {l.flag} {l.label}
+              </button>
+            ))}
+
+            {/* Mic toggle button */}
+            <button
+              type="button"
+              onClick={isListening ? stop : start}
+              className={cn(
+                'p-1.5 rounded-full border transition-all duration-200',
+                isListening
+                  ? 'bg-red-500 text-white border-red-500 animate-pulse'
+                  : 'bg-secondary text-muted-foreground border-border hover:text-foreground hover:border-primary'
+              )}
+              title={isListening ? 'Stop recording' : `Speak in ${SPEECH_LANGS.find(l => l.code === lang)?.label}`}
+            >
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Listening indicator */}
+      {isListening && (
+        <div className="flex items-center gap-2 text-xs text-red-500 animate-pulse">
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+          {language === 'en'
+            ? `Listening in ${SPEECH_LANGS.find(l => l.code === lang)?.label}…`
+            : language === 'ml'
+              ? 'ആലിക്കുന്നു…'
+              : 'सुन रहा है…'}
+        </div>
+      )}
+
+      {/* Textarea */}
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={4}
+        className={cn('input-field resize-none', ml && 'font-malayalam')}
+      />
+    </div>
+  );
+}
 
 export default function ReportPage() {
   const { t, language } = useLanguage();
@@ -454,18 +547,14 @@ export default function ReportPage() {
                   <p className="text-xs text-muted-foreground text-right">{title.length}/50</p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className={cn("label-text", language === 'ml' && "font-malayalam")}>
-                    {t.description} *
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder={t.descriptionPlaceholder}
-                    rows={4}
-                    className={cn("input-field resize-none", language === 'ml' && "font-malayalam")}
-                  />
-                </div>
+                {/* Description with mic */}
+                <DescriptionField
+                  value={description}
+                  onChange={setDescription}
+                  placeholder={t.descriptionPlaceholder}
+                  label={t.description}
+                  language={language}
+                />
 
                 {/* Photos */}
                 <div className="space-y-2">
