@@ -40,10 +40,18 @@ interface DescriptionFieldProps {
   language: string;
 }
 
+// Language order: Malayalam first, then English, then Hindi
+const ORDERED_SPEECH_LANGS = [
+  { code: 'ml-IN' as const, label: 'മലയാളം', nativeLabel: 'Malayalam' },
+  { code: 'en-IN' as const, label: 'English', nativeLabel: 'English' },
+  { code: 'hi-IN' as const, label: 'हिंदी', nativeLabel: 'Hindi' },
+];
+
 function DescriptionField({ value, onChange, placeholder, label, language }: DescriptionFieldProps) {
-  const { isListening, lang, setLang, supported, start, stop } = useSpeechToText({
+  const [showLangPicker, setShowLangPicker] = useState(false);
+
+  const { isListening, setLang, supported, start, stop } = useSpeechToText({
     onResult: (text) => {
-      // Append transcript to existing text (with space separator if needed)
       onChange(value ? `${value} ${text}` : text);
     },
     onError: (err) => {
@@ -53,48 +61,71 @@ function DescriptionField({ value, onChange, placeholder, label, language }: Des
 
   const ml = language === 'ml';
 
+  const handleMicClick = () => {
+    if (isListening) { stop(); return; }
+    setShowLangPicker(true);
+  };
+
+  const handleLangSelect = (code: 'ml-IN' | 'en-IN' | 'hi-IN') => {
+    setLang(code);
+    setShowLangPicker(false);
+    start(code); // pass forceLang directly — avoids stale closure
+  };
+
   return (
     <div className="space-y-2">
       {/* Label row */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <label className={cn('label-text', ml && 'font-malayalam')}>
           {label} *
         </label>
 
         {supported && (
-          <div className="flex items-center gap-1.5">
-            {/* Language selector pills */}
-            {SPEECH_LANGS.map((l) => (
-              <button
-                key={l.code}
-                type="button"
-                onClick={() => setLang(l.code)}
-                className={cn(
-                  'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
-                  lang === l.code
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
-                )}
-                title={`Record in ${l.label}`}
-              >
-                {l.flag} {l.label}
-              </button>
-            ))}
-
-            {/* Mic toggle button */}
+          <div className="relative">
+            {/* Single mic button */}
             <button
               type="button"
-              onClick={isListening ? stop : start}
+              onClick={handleMicClick}
               className={cn(
-                'p-1.5 rounded-full border transition-all duration-200',
+                'p-2 rounded-full border transition-all duration-200',
                 isListening
                   ? 'bg-red-500 text-white border-red-500 animate-pulse'
                   : 'bg-secondary text-muted-foreground border-border hover:text-foreground hover:border-primary'
               )}
-              title={isListening ? 'Stop recording' : `Speak in ${SPEECH_LANGS.find(l => l.code === lang)?.label}`}
+              title={isListening ? 'Stop recording' : 'Voice input'}
             >
               {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </button>
+
+            {/* Language picker popup */}
+            {showLangPicker && (
+              <div className="absolute right-0 top-10 z-50 bg-card border border-border rounded-xl shadow-lg overflow-hidden w-44 animate-fade-in">
+                <p className="text-[10px] text-muted-foreground px-3 pt-2 pb-1 uppercase tracking-wide font-medium">
+                  {language === 'ml' ? 'ഭാഷ തിരഞ്ഞെടുക്കുക' : 'Choose language'}
+                </p>
+                {ORDERED_SPEECH_LANGS.map((l) => (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => handleLangSelect(l.code)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-secondary transition-colors text-left"
+                  >
+                    <Mic className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <div>
+                      <span className="block font-medium leading-tight">{l.label}</span>
+                      <span className="block text-[10px] text-muted-foreground">{l.nativeLabel}</span>
+                    </div>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setShowLangPicker(false)}
+                  className="w-full text-[11px] text-muted-foreground py-2 hover:bg-secondary border-t border-border transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -103,12 +134,16 @@ function DescriptionField({ value, onChange, placeholder, label, language }: Des
       {isListening && (
         <div className="flex items-center gap-2 text-xs text-red-500 animate-pulse">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-          {language === 'en'
-            ? `Listening in ${SPEECH_LANGS.find(l => l.code === lang)?.label}…`
-            : language === 'ml'
-              ? 'ആലിക്കുന്നു…'
-              : 'सुन रहा है…'}
+          {language === 'ml' ? 'ആലിക്കുന്നു…' : language === 'hi' ? 'सुन रहा है…' : 'Listening…'}
         </div>
+      )}
+
+      {/* Backdrop to close picker on outside click */}
+      {showLangPicker && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowLangPicker(false)}
+        />
       )}
 
       {/* Textarea */}

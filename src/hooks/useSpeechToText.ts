@@ -24,7 +24,7 @@ interface UseSpeechToTextReturn {
     lang: SpeechLang;
     setLang: (l: SpeechLang) => void;
     supported: boolean;
-    start: () => void;
+    start: (forceLang?: SpeechLang) => void;
     stop: () => void;
 }
 
@@ -46,7 +46,7 @@ export function useSpeechToText({ onResult, onError }: UseSpeechToTextOptions): 
         setIsListening(false);
     }, []);
 
-    const start = useCallback(() => {
+    const start = useCallback((forceLang?: SpeechLang) => {
         if (!SpeechRecognitionAPI) {
             onError?.('Speech recognition is not supported in this browser.');
             return;
@@ -56,7 +56,7 @@ export function useSpeechToText({ onResult, onError }: UseSpeechToTextOptions): 
         recognitionRef.current?.stop();
 
         const recognition: any = new SpeechRecognitionAPI();
-        recognition.lang = lang;
+        recognition.lang = forceLang ?? lang;  // use forceLang if provided to avoid stale closure
         recognition.continuous = false;       // single utterance
         recognition.interimResults = false;   // only final results
         recognition.maxAlternatives = 1;
